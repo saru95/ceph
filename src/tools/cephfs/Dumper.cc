@@ -31,16 +31,19 @@
 
 #define HEADER_LEN 4096
 
-int Dumper::init(int rank_)
+int Dumper::init(mds_role_t role_)
 {
-  rank = rank_;
+  role = role_;
 
   int r = MDSUtility::init();
   if (r < 0) {
     return r;
   }
 
-  JournalPointer jp(rank, mdsmap->get_metadata_pool());
+  auto fs =  fsmap->get_filesystem(role.fscid);
+  assert(fs != nullptr);
+
+  JournalPointer jp(role.rank, fs->mds_map.get_metadata_pool());
   int jp_load_result = jp.load(objecter);
   if (jp_load_result != 0) {
     std::cerr << "Error loading journal: " << cpp_strerror(jp_load_result) << std::endl;
@@ -74,8 +77,12 @@ int Dumper::dump(const char *dump_file)
 {
   int r = 0;
 
-  Journaler journaler(ino, mdsmap->get_metadata_pool(), CEPH_FS_ONDISK_MAGIC,
-                                       objecter, 0, 0, &timer, &finisher);
+  auto fs =  fsmap->get_filesystem(role.fscid);
+  assert(fs != nullptr);
+
+  Journaler journaler(ino, fs->mds_map.get_metadata_pool(),
+                      CEPH_FS_ONDISK_MAGIC, objecter, 0, 0,
+                      &timer, &finisher);
   r = recover_journal(&journaler);
   if (r) {
     return r;
@@ -94,7 +101,7 @@ int Dumper::dump(const char *dump_file)
     char buf[HEADER_LEN];
     memset(buf, 0, sizeof(buf));
     snprintf(buf, HEADER_LEN, "Ceph mds%d journal dump\n start offset %llu (0x%llx)\n       length %llu (0x%llx)\n    write_pos %llu (0x%llx)\n    format %llu\n    trimmed_pos %llu (0x%llx)\n%c",
-	    rank, 
+	    role.rank, 
 	    (unsigned long long)start, (unsigned long long)start,
 	    (unsigned long long)len, (unsigned long long)len,
 	    (unsigned long long)journaler.last_committed.write_pos, (unsigned long long)journaler.last_committed.write_pos,
@@ -174,6 +181,9 @@ int Dumper::undump(const char *dump_file)
 {
   cout << "undump " << dump_file << std::endl;
   
+  auto fs =  fsmap->get_filesystem(role.fscid);
+  assert(fs != nullptr);
+
   int r = 0;
   int fd = ::open(dump_file, O_RDONLY);
   if (fd < 0) {
@@ -234,13 +244,13 @@ int Dumper::undump(const char *dump_file)
   h.magic = CEPH_FS_ONDISK_MAGIC;
 
   h.layout = g_default_file_layout;
-  h.layout.fl_pg_pool = mdsmap->get_metadata_pool();
+  h.layout.fl_pg_pool = fs->mds_map.get_metadata_pool();
   
   bufferlist hbl;
   ::encode(h, hbl);
 
   object_t oid = file_object_t(ino, 0);
-  object_locator_t oloc(mdsmap->get_metadata_pool());
+  object_locator_t oloc(fs->mds_map.get_metadata_pool());
   SnapContext snapc;
 
   cout << "writing header " << oid << std::endl;
