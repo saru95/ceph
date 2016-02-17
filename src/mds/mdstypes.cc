@@ -1123,3 +1123,9 @@ void ceph_file_layout_wrapper::dump(Formatter *f) const
   ::dump(static_cast<const ceph_file_layout&>(*this), f);
 }
 
+ostream& operator<<(ostream &out, const mds_role_t &role)
+{
+  out << role.fscid << ":" << role.rank;
+  return out;
+}
+
