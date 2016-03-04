@@ -242,7 +242,7 @@ def parse_cmdargs(args=None, target=''):
 
 
 def hdr(s):
-    print ('\n', s, '\n', '=' * len(s))
+    print '\n', s, '\n', '=' * len(s)
 
 def do_basic_help(parser, args):
     """
