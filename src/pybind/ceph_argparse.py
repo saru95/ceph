@@ -1096,7 +1096,7 @@ class RadosThread(threading.Thread):
         self.args = args
         self.kwargs = kwargs
         self.target = target
-	self.exception = None
+	    self.exception = None
         threading.Thread.__init__(self)
 
     def run(self):
